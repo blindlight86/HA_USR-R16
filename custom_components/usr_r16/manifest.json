@@ -1,0 +1,10 @@
+{
+    "domain": "usr_r16",
+    "name": "USR r16",
+    "documentation": "https://github.com/blindlight86/USR-R16",
+    "requirements": [
+      "usr-r16==0.0.2"
+    ],
+    "dependencies": [],
+    "codeowners": []
+  }
