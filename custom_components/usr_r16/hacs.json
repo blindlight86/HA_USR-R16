@@ -1,0 +1,7 @@
+{
+    "name": "USR-R16 16路网络继电器",
+    "domains": ["switch"],
+    "render_readme": true,
+    "homeassistant": "0.106.0",
+    "country": ["CN"]
+  }
