@@ -6,5 +6,8 @@
       "usr-r16==0.0.2"
     ],
     "dependencies": [],
-    "codeowners": []
+    "codeowners": [
+      "@blindlight"
+    ],
+    "config_flow": true
   }
