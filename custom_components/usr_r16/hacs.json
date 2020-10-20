@@ -3,5 +3,6 @@
     "domains": ["switch"],
     "render_readme": true,
     "homeassistant": "0.106.0",
-    "country": ["CN"]
-  }
+    "country": ["CN"],
+    "iot_class": ["Assumed State", "Local Push"]
+  }	
