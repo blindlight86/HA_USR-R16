@@ -175,7 +175,7 @@ class R16Device(Entity):
         """Propagate changes through ha."""
         _LOGGER.info("Relay %s new state callback: %r", self.unique_id, event)
         self._is_on = event
-        _LOGGER.info("is_on", self._is_on)
+        _LOGGER.info(f"is_on: {self._is_on}")
         self.async_write_ha_state()
 
     @property
