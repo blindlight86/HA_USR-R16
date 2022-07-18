@@ -11,13 +11,16 @@ from homeassistant.const import (
     CONF_SWITCHES,
     CONF_NAME,
 )
-from homeassistant.core import callback
+from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
+from homeassistant.core import HomeAssistant, callback
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.dispatcher import (
     async_dispatcher_send,
     async_dispatcher_connect,
 )
+from homeassistant.helpers.typing import ConfigType
 
 from .const import (
     CONNECTION_TIMEOUT,
@@ -62,7 +65,7 @@ CONFIG_SCHEMA = vol.Schema(
     extra=vol.ALLOW_EXTRA,
 )
 
-async def async_setup(hass, config):
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Component setup, do nothing."""
     if DOMAIN not in config:
         return True
@@ -78,7 +81,7 @@ async def async_setup(hass, config):
         )
     return True
     
-async def async_setup_entry(hass, entry):
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the USR-R16 switch."""
     hass.data.setdefault(DOMAIN, {})
     host = entry.data[CONF_HOST]
@@ -135,7 +138,7 @@ async def async_setup_entry(hass, entry):
 
     return True
 
-async def async_unload_entry(hass, entry):
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     client = hass.data[DOMAIN][entry.entry_id].pop(DATA_DEVICE_REGISTER)
     client.stop()

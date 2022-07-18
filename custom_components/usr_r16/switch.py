@@ -1,5 +1,8 @@
 """Support for USR-R16 switches."""
-from homeassistant.components.switch import ToggleEntity
+from homeassistant.components.switch import SwitchEntity
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 # from homeassistant.const import CONF_NAME
 
 from . import DATA_DEVICE_REGISTER, R16Device
@@ -31,12 +34,13 @@ def devices_from_entities(hass, entry):
         devices.append(device)
     return devices
 
-async def async_setup_entry(hass, entry, async_add_entities):
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up the USR-R16 platform."""
     async_add_entities(devices_from_entities(hass, entry))
 
 
-class R16Switch(R16Device, ToggleEntity):
+class R16Switch(R16Device, SwitchEntity):
     """Representation of a USR-R16 switch."""
 
     @property
