@@ -123,6 +123,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             loop=hass.loop,
             timeout=CONNECTION_TIMEOUT,
             reconnect_interval=DEFAULT_RECONNECT_INTERVAL,
+            keep_alive_interval=DEFAULT_KEEP_ALIVE_INTERVAL,
         )
 
         hass.data[DOMAIN][entry.entry_id][DATA_DEVICE_REGISTER] = client

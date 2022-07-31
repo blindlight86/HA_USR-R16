@@ -5,7 +5,7 @@
     "documentation": "https://github.com/blindlight86/USR-R16",
     "issue_tracker": "https://github.com/blindlight86/HA_USR-R16/issues",
     "requirements": [
-      "usr-r16==0.0.2"
+      "usr-r16==0.0.4"
     ],
     "dependencies": [],
     "codeowners": [

@@ -35,7 +35,8 @@ async def connect_client(hass, user_input):
         password=user_input[CONF_PASSWORD],
         loop=hass.loop,
         timeout=CONNECTION_TIMEOUT,
-        reconnect_interval=DEFAULT_RECONNECT_INTERVAL
+        reconnect_interval=DEFAULT_RECONNECT_INTERVAL,
+        keep_alive_interval=DEFAULT_KEEP_ALIVE_INTERVAL
     )
     return await asyncio.wait_for(client_aw, timeout=CONNECTION_TIMEOUT)
 
