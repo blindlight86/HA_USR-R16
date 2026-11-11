@@ -75,7 +75,6 @@ class R16FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a USR-R16 config flow."""
 
     VERSION = 1
-    CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_PUSH
 
     async def async_step_import(self, user_input):
         """Handle import."""
