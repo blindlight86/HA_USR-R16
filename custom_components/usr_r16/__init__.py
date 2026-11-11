@@ -1,7 +1,8 @@
 """Support for USR-R16 relay switches."""
+import asyncio
 import logging
 
-from usr_r16 import create_usr_r16_client_connection
+from usr_r16.protocol import USR16Client
 import voluptuous as vol
 
 from homeassistant.const import (
@@ -10,9 +11,11 @@ from homeassistant.const import (
     CONF_PASSWORD,
     CONF_SWITCHES,
     CONF_NAME,
+    Platform,
 )
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import ConfigEntryNotReady
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.device_registry import DeviceEntryType
@@ -36,6 +39,7 @@ _LOGGER = logging.getLogger(__name__)
 
 DATA_DEVICE_REGISTER = "usr_r16_device_register"
 DATA_DEVICE_LISTENER = "usr_r16_device_listener"
+PLATFORMS = (Platform.SWITCH,)
 
 # SIGNAL_AVAILABILITY = "usr_r16_device_available_{}"
 
@@ -83,20 +87,10 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the USR-R16 switch."""
-    hass.data.setdefault(DOMAIN, {})
     host = entry.data[CONF_HOST]
     port = entry.data[CONF_PORT]
     password = entry.data[CONF_PASSWORD]
     address = f"{host}:{port}"
-
-    hass.data[DOMAIN][entry.entry_id] = {}
-
-    # def add_device(device):
-    #     switches = config[DOMAIN][device][CONF_SWITCHES]
-
-    #     host = config[DOMAIN][device][CONF_HOST]
-    #     port = config[DOMAIN][device][CONF_PORT]
-    #     password = config[DOMAIN][device][CONF_PASSWORD]
 
     @callback
     def disconnected():
@@ -110,47 +104,63 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.warning("USR-R16 %s connected", address)
         async_dispatcher_send(hass, f'usr_r16_device_available_{entry.entry_id}', True)
 
-    async def connect():
-        """Set up connection and hook it into HA for reconnect/shutdown."""
-        _LOGGER.info("Initiating USR-R16 connection to %s", address)
+    client = R16Client(
+        hass,
+        entry,
+        host=host,
+        port=port,
+        password=password,
+        disconnect_callback=disconnected,
+        reconnect_callback=reconnected,
+        loop=hass.loop,
+        timeout=CONNECTION_TIMEOUT,
+        reconnect_interval=DEFAULT_RECONNECT_INTERVAL,
+        keep_alive_interval=DEFAULT_KEEP_ALIVE_INTERVAL,
+    )
 
-        client = await create_usr_r16_client_connection(
-            host=host,
-            port=port,
-            password=password,
-            disconnect_callback=disconnected,
-            reconnect_callback=reconnected,
-            loop=hass.loop,
-            timeout=CONNECTION_TIMEOUT,
-            reconnect_interval=DEFAULT_RECONNECT_INTERVAL,
-            keep_alive_interval=DEFAULT_KEEP_ALIVE_INTERVAL,
-        )
+    @callback
+    def cleanup():
+        """Release this entry's connection on setup failure or unload."""
+        client.stop()
+        if (entries := hass.data.get(DOMAIN)) is not None:
+            entries.pop(entry.entry_id, None)
+            if not entries:
+                hass.data.pop(DOMAIN)
 
-        hass.data[DOMAIN][entry.entry_id][DATA_DEVICE_REGISTER] = client
+    entry.async_on_unload(cleanup)
+    _LOGGER.info("Initiating USR-R16 connection to %s", address)
+    try:
+        async with asyncio.timeout(CONNECTION_TIMEOUT):
+            await client.setup()
+    except (TimeoutError, OSError) as err:
+        raise ConfigEntryNotReady(f"Could not connect to USR-R16 at {address}") from err
 
-        # Load entites
-        hass.async_create_task(
-            hass.config_entries.async_forward_entry_setup(entry, "switch")
-        )
-
-        _LOGGER.info("Connected to USR-R16 device: %s", address)
-
-    hass.loop.create_task(connect())
-
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {DATA_DEVICE_REGISTER: client}
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    client = hass.data[DOMAIN][entry.entry_id].pop(DATA_DEVICE_REGISTER)
-    client.stop()
-    unload_ok = await hass.config_entries.async_forward_entry_unload(entry, "switch")
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
-    if unload_ok:
-        if hass.data[DOMAIN][entry.entry_id]:
-            hass.data[DOMAIN].pop(entry.entry_id)
-        if not hass.data[DOMAIN]:
-            hass.data.pop(DOMAIN)
-    return unload_ok
+
+class R16Client(USR16Client):
+    """Tie the driver's reconnect tasks to the config entry lifecycle."""
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, **kwargs):
+        super().__init__(**kwargs)
+        self._hass = hass
+        self._entry = entry
+
+    async def handle_disconnect_callback(self):
+        """Run automatic reconnect as a task Home Assistant can cancel."""
+        self.is_connected = False
+        if self.reconnect:
+            await self._entry.async_create_background_task(
+                self._hass, super().handle_disconnect_callback(), "USR-R16 reconnect"
+            )
+
 
 class R16Device(Entity):
     """Representation of a USR-R16 device.
@@ -204,9 +214,9 @@ class R16Device(Entity):
         self._client.register_status_callback(
             self.handle_event_callback, self._device_port
         )
-        for switch in range(1,17):
-            _LOGGER.info(f'callback is {self._client.status_callbacks.get(switch, [])}')
-        self._is_on = await self._client.status(self._device_port)
+        callbacks = self._client.status_callbacks[self._device_port]
+        self.async_on_remove(lambda: callbacks.remove(self.handle_event_callback))
+        self._is_on = self._client.states.get(self._device_port)
         self.async_on_remove(
             async_dispatcher_connect(
                 self.hass,
